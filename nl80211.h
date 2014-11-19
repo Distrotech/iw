@@ -1669,6 +1669,8 @@ enum nl80211_commands {
  * @NL80211_ATTR_SMPS_MODE: SMPS mode to use (ap mode). see
  *	&enum nl80211_smps_mode.
  *
+ * @NL80211_ATTR_MAC_MASK: MAC address mask
+ *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
  */
@@ -2020,6 +2022,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_ADMITTED_TIME,
 
 	NL80211_ATTR_SMPS_MODE,
+
+	NL80211_ATTR_MAC_MASK,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -2746,15 +2750,15 @@ enum nl80211_user_reg_hint_type {
  * @NL80211_SURVEY_INFO_FREQUENCY: center frequency of channel
  * @NL80211_SURVEY_INFO_NOISE: noise level of channel (u8, dBm)
  * @NL80211_SURVEY_INFO_IN_USE: channel is currently being used
- * @NL80211_SURVEY_INFO_CHANNEL_TIME: amount of time (in ms) that the radio
+ * @NL80211_SURVEY_INFO_TIME: amount of time (in ms) that the radio
  *	spent on this channel
- * @NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY: amount of the time the primary
+ * @NL80211_SURVEY_INFO_TIME_BUSY: amount of the time the primary
  *	channel was sensed busy (either due to activity or energy detect)
- * @NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY: amount of time the extension
+ * @NL80211_SURVEY_INFO_TIME_EXT_BUSY: amount of time the extension
  *	channel was sensed busy
- * @NL80211_SURVEY_INFO_CHANNEL_TIME_RX: amount of time the radio spent
+ * @NL80211_SURVEY_INFO_TIME_RX: amount of time the radio spent
  *	receiving data
- * @NL80211_SURVEY_INFO_CHANNEL_TIME_TX: amount of time the radio spent
+ * @NL80211_SURVEY_INFO_TIME_TX: amount of time the radio spent
  *	transmitting data
  * @NL80211_SURVEY_INFO_MAX: highest survey info attribute number
  *	currently defined
@@ -2765,16 +2769,23 @@ enum nl80211_survey_info {
 	NL80211_SURVEY_INFO_FREQUENCY,
 	NL80211_SURVEY_INFO_NOISE,
 	NL80211_SURVEY_INFO_IN_USE,
-	NL80211_SURVEY_INFO_CHANNEL_TIME,
-	NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY,
-	NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY,
-	NL80211_SURVEY_INFO_CHANNEL_TIME_RX,
-	NL80211_SURVEY_INFO_CHANNEL_TIME_TX,
+	NL80211_SURVEY_INFO_TIME,
+	NL80211_SURVEY_INFO_TIME_BUSY,
+	NL80211_SURVEY_INFO_TIME_EXT_BUSY,
+	NL80211_SURVEY_INFO_TIME_RX,
+	NL80211_SURVEY_INFO_TIME_TX,
 
 	/* keep last */
 	__NL80211_SURVEY_INFO_AFTER_LAST,
 	NL80211_SURVEY_INFO_MAX = __NL80211_SURVEY_INFO_AFTER_LAST - 1
 };
+
+/* keep old names for compatibility */
+#define NL80211_SURVEY_INFO_CHANNEL_TIME		NL80211_SURVEY_INFO_TIME
+#define NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY		NL80211_SURVEY_INFO_TIME_BUSY
+#define NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY	NL80211_SURVEY_INFO_TIME_EXT_BUSY
+#define NL80211_SURVEY_INFO_CHANNEL_TIME_RX		NL80211_SURVEY_INFO_TIME_RX
+#define NL80211_SURVEY_INFO_CHANNEL_TIME_TX		NL80211_SURVEY_INFO_TIME_TX
 
 /**
  * enum nl80211_mntr_flags - monitor configuration flags
@@ -4095,6 +4106,14 @@ enum nl80211_ap_sme_features {
  * @NL80211_FEATURE_MAC_ON_CREATE: Device supports configuring
  *	the vif's MAC address upon creation.
  *	See 'macaddr' field in the vif_params (cfg80211.h).
+ * @NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR: This device/driver supports using a
+ *	random MAC address during scan (if the device is unassociated); the
+ *	%NL80211_SCAN_FLAG_RANDOM_ADDR flag may be set for scans and the MAC
+ *	address mask/value will be used.
+ * @NL80211_FEATURE_SCHED_SCAN_RANDOM_MAC_ADDR: This device/driver supports
+ *	using a random MAC address for every scan iteration during scheduled
+ *	scan (while not associated), the %NL80211_SCAN_FLAG_RANDOM_ADDR may
+ *	be set for scheduled scan and the MAC address mask/value will be used.
  */
 enum nl80211_feature_flags {
 	NL80211_FEATURE_SK_TX_STATUS			= 1 << 0,
@@ -4125,6 +4144,8 @@ enum nl80211_feature_flags {
 	NL80211_FEATURE_DYNAMIC_SMPS			= 1 << 25,
 	NL80211_FEATURE_SUPPORTS_WMM_ADMISSION		= 1 << 26,
 	NL80211_FEATURE_MAC_ON_CREATE			= 1 << 27,
+	NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR		= 1 << 28,
+	NL80211_FEATURE_SCHED_SCAN_RANDOM_MAC_ADDR	= 1 << 29,
 };
 
 /**
@@ -4173,11 +4194,21 @@ enum nl80211_connect_failed_reason {
  *	dangerous because will destroy stations performance as a lot of frames
  *	will be lost while scanning off-channel, therefore it must be used only
  *	when really needed
+ * @NL80211_SCAN_FLAG_RANDOM_ADDR: use a random MAC address for this scan (or
+ *	for scheduled scan: a different one for every scan iteration). When the
+ *	flag is set, depending on device capabilities the @NL80211_ATTR_MAC and
+ *	@NL80211_ATTR_MAC_MASK attributes may also be given in which case only
+ *	the masked bits will be preserved from the MAC address and the remainder
+ *	be randomized. If the attributes are not given, full randomisation (46
+ *	bits, locally administered 1, multicast 0) is assumed.
+ *	This flag must not be requested when the feature isn't supported, check
+ *	the nl80211 feature flags for the device.
  */
 enum nl80211_scan_flags {
 	NL80211_SCAN_FLAG_LOW_PRIORITY			= 1<<0,
 	NL80211_SCAN_FLAG_FLUSH				= 1<<1,
 	NL80211_SCAN_FLAG_AP				= 1<<2,
+	NL80211_SCAN_FLAG_RANDOM_ADDR			= 1<<3,
 };
 
 /**
