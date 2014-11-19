@@ -333,6 +333,28 @@ static int print_event(struct nl_msg *msg, void *arg)
 		}
 		printf("\n");
 		break;
+	case NL80211_CMD_START_SCHED_SCAN:
+		printf("scheduled scan started\n");
+		break;
+	case NL80211_CMD_SCHED_SCAN_STOPPED:
+		printf("sched scan stopped\n");
+		break;
+	case NL80211_CMD_SCHED_SCAN_RESULTS:
+		printf("got scheduled scan results:");
+		if (tb[NL80211_ATTR_SCAN_FREQUENCIES]) {
+			nla_for_each_nested(nst, tb[NL80211_ATTR_SCAN_FREQUENCIES], rem_nst)
+				printf(" %d", nla_get_u32(nst));
+			printf(",");
+		}
+		if (tb[NL80211_ATTR_SCAN_SSIDS]) {
+			nla_for_each_nested(nst, tb[NL80211_ATTR_SCAN_SSIDS], rem_nst) {
+				printf(" \"");
+				print_ssid_escaped(nla_len(nst), nla_data(nst));
+				printf("\"");
+			}
+		}
+		printf("\n");
+		break;
 	case NL80211_CMD_REG_CHANGE:
 		printf("regulatory domain change: ");
 

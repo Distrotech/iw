@@ -1810,3 +1810,163 @@ COMMAND(scan, trigger, "[freq <freq>*] [ies <hex as 00:11:..>] [meshid <meshid>]
 	NL80211_CMD_TRIGGER_SCAN, 0, CIB_NETDEV, handle_scan,
 	 "Trigger a scan on the given frequencies with probing for the given\n"
 	 "SSIDs (or wildcard if not given) unless passive scanning is requested.");
+
+
+static int handle_start_sched_scan(struct nl80211_state *state,
+				   struct nl_cb *cb, struct nl_msg *msg,
+				   int argc, char **argv, enum id_input id)
+{
+	struct nl_msg *ssids = NULL, *freqs = NULL;
+	struct nl_msg *match_sets = NULL, *match_set_ssid = NULL;
+	char *eptr;
+	int err = -ENOBUFS;
+	int i;
+	enum {
+		NONE,
+		FREQ,
+		IES,
+		SSID,
+		MATCH,
+		DONE,
+	} parse = NONE;
+	int freq;
+	bool passive = false, have_ssids = false, have_freqs = false;
+	bool have_matches = false;
+	size_t tmp;
+	unsigned char *ies;
+
+	if (argc < 1)
+		return 1;
+
+	if (!*argv[0])
+		return 1;
+
+	NLA_PUT_U32(msg, NL80211_ATTR_SCHED_SCAN_INTERVAL,
+		    strtoul(argv[0], &eptr, 10));
+	if (*eptr)
+		return 1;
+
+	argv++;
+	argc--;
+
+	ssids = nlmsg_alloc();
+	if (!ssids)
+		return -ENOMEM;
+
+	freqs = nlmsg_alloc();
+	if (!freqs) {
+		nlmsg_free(ssids);
+		return -ENOMEM;
+	}
+
+	match_sets = nlmsg_alloc();
+	if (!match_sets) {
+		nlmsg_free(ssids);
+		nlmsg_free(freqs);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < argc; i++) {
+		switch (parse) {
+		case NONE:
+			if (strcmp(argv[i], "freq") == 0) {
+				parse = FREQ;
+				have_freqs = true;
+				break;
+			} else if (strcmp(argv[i], "ies") == 0) {
+				parse = IES;
+				break;
+			} else if (strcmp(argv[i], "ssid") == 0) {
+				parse = SSID;
+				have_ssids = true;
+				break;
+			} else if (strcmp(argv[i], "match") == 0) {
+				parse = MATCH;
+				have_matches = true;
+				break;
+			} else if (strcmp(argv[i], "passive") == 0) {
+				parse = DONE;
+				passive = true;
+				break;
+			}
+		case DONE:
+			return 1;
+		case FREQ:
+			freq = strtoul(argv[i], &eptr, 10);
+			if (*eptr)
+				return 1;
+			NLA_PUT_U32(freqs, i, freq);
+			parse = NONE;
+			break;
+		case IES:
+			ies = parse_hex(argv[i], &tmp);
+			if (!ies)
+				goto nla_put_failure;
+			NLA_PUT(msg, NL80211_ATTR_IE, tmp, ies);
+			free(ies);
+			parse = NONE;
+			break;
+		case SSID:
+			NLA_PUT(ssids, i, strlen(argv[i]), argv[i]);
+			parse = NONE;
+			break;
+		case MATCH:
+			match_set_ssid = nlmsg_alloc();
+			if (!match_set_ssid) {
+				nlmsg_free(match_sets);
+				nlmsg_free(ssids);
+				nlmsg_free(freqs);
+				return -ENOMEM;
+			}
+
+			if (nla_put(match_set_ssid, NL80211_ATTR_SCHED_SCAN_MATCH_SSID,
+				    strlen(argv[i]), argv[i])) {
+				nlmsg_free(match_set_ssid);
+				goto nla_put_failure;
+			}
+
+			nla_put_nested(match_sets, i, match_set_ssid);
+
+			nlmsg_free(match_set_ssid);
+			parse = NONE;
+			break;
+		}
+	}
+
+	if (!have_ssids)
+		NLA_PUT(ssids, 1, 0, "");
+	if (!passive)
+		nla_put_nested(msg, NL80211_ATTR_SCAN_SSIDS, ssids);
+
+	if (have_matches)
+		nla_put_nested(msg, NL80211_ATTR_SCHED_SCAN_MATCH, match_sets);
+
+	if (have_freqs)
+		nla_put_nested(msg, NL80211_ATTR_SCAN_FREQUENCIES, freqs);
+
+	err = 0;
+ nla_put_failure:
+	nlmsg_free(ssids);
+	nlmsg_free(freqs);
+	nlmsg_free(match_sets);
+	return err;
+}
+
+static int handle_stop_sched_scan(struct nl80211_state *state, struct nl_cb *cb,
+				  struct nl_msg *msg, int argc, char **argv,
+				  enum id_input id)
+{
+	return 0;
+}
+
+COMMAND(scan, sched_start,
+	"<interval in msecs> [freq <freq>*] [ies <hex as 00:11:..>] "
+	"[ssid <ssid>*|passive] [randomise[=<addr>/<mask>]] [match <ssid>*]",
+	NL80211_CMD_START_SCHED_SCAN, 0, CIB_NETDEV, handle_start_sched_scan,
+	"Start a scheduled scan at the specified interval on the given frequencies\n"
+	"with probing for the given SSIDs (or wildcard if not given) unless passive\n"
+	"scanning is requested.  If matches are specified, only matching results\n"
+	"will be returned.");
+COMMAND(scan, sched_stop, "",
+	NL80211_CMD_STOP_SCHED_SCAN, 0, CIB_NETDEV, handle_stop_sched_scan,
+	"Stop an ongoing scheduled scan.");
