@@ -1834,6 +1834,7 @@ static int handle_start_sched_scan(struct nl80211_state *state,
 	bool have_matches = false;
 	size_t tmp;
 	unsigned char *ies;
+	uint32_t flags = 0;
 
 	if (argc < 1)
 		return 1;
@@ -1883,6 +1884,13 @@ static int handle_start_sched_scan(struct nl80211_state *state,
 			} else if (strcmp(argv[i], "match") == 0) {
 				parse = MATCH;
 				have_matches = true;
+				break;
+			} else if (strncmp(argv[i], "randomise", 9) == 0 ||
+				   strncmp(argv[i], "randomize", 9) == 0) {
+				flags |= NL80211_SCAN_FLAG_RANDOM_ADDR;
+				err = parse_random_mac_addr(msg, argv[i]);
+				if (err)
+					goto nla_put_failure;
 				break;
 			} else if (strcmp(argv[i], "passive") == 0) {
 				parse = DONE;
@@ -1943,6 +1951,9 @@ static int handle_start_sched_scan(struct nl80211_state *state,
 
 	if (have_freqs)
 		nla_put_nested(msg, NL80211_ATTR_SCAN_FREQUENCIES, freqs);
+
+	if (flags)
+		NLA_PUT_U32(msg, NL80211_ATTR_SCAN_FLAGS, flags);
 
 	err = 0;
  nla_put_failure:
