@@ -565,6 +565,31 @@ static int print_event(struct nl_msg *msg, void *arg)
 				   nla_data(tb[NL80211_ATTR_VENDOR_DATA]),
 				   nla_len(tb[NL80211_ATTR_VENDOR_DATA]));
 		break;
+	case NL80211_CMD_RADAR_DETECT:
+		printf("radar event ");
+		if (tb[NL80211_ATTR_RADAR_EVENT]) {
+			switch (nla_get_u32(tb[NL80211_ATTR_RADAR_EVENT])) {
+				case NL80211_RADAR_DETECTED:
+					printf("(radar detected)");
+					break;
+				case NL80211_RADAR_CAC_FINISHED:
+					printf("(cac finished)");
+					break;
+				case NL80211_RADAR_CAC_ABORTED:
+					printf("(cac aborted)");
+					break;
+				case NL80211_RADAR_NOP_FINISHED:
+					printf("(nop finished)");
+					break;
+				default:
+					printf("(unknown)");
+					break;
+			};
+		} else {
+			printf("(unknown)");
+		}
+		printf("\n");
+		break;
 	default:
 		printf("unknown event %d (%s)\n",
 		       gnlh->cmd, command_name(gnlh->cmd));
