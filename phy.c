@@ -2,6 +2,9 @@
 #include <errno.h>
 #include <net/if.h>
 #include <strings.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <netlink/genl/genl.h>
 #include <netlink/genl/family.h>
@@ -296,6 +299,24 @@ COMMAND(set, retry, "[short <limit>] [long <limit>]",
 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_retry,
 	"Set retry limit.");
 
+#ifndef NETNS_RUN_DIR
+#define NETNS_RUN_DIR "/var/run/netns"
+#endif
+int netns_get_fd(const char *name)
+{
+	char pathbuf[MAXPATHLEN];
+	const char *path, *ptr;
+
+	path = name;
+	ptr = strchr(name, '/');
+	if (!ptr) {
+		snprintf(pathbuf, sizeof(pathbuf), "%s/%s",
+			NETNS_RUN_DIR, name );
+		path = pathbuf;
+	}
+	return open(path, O_RDONLY);
+}
+
 static int handle_netns(struct nl80211_state *state,
 			struct nl_cb *cb,
 			struct nl_msg *msg,
@@ -303,26 +324,42 @@ static int handle_netns(struct nl80211_state *state,
 			enum id_input id)
 {
 	char *end;
+	int fd;
 
-	if (argc != 1)
+	if (argc < 1 || !*argv[0])
 		return 1;
 
-	if (!*argv[0])
+	if (argc == 1) {
+		NLA_PUT_U32(msg, NL80211_ATTR_PID,
+				strtoul(argv[0], &end, 10));
+		if (*end != '\0') {
+			printf("Invalid parameter: pid(%s)\n", argv[0]);
+			return 1;
+		}
+		return 0;
+	}
+
+	if (argc != 2 || strcmp(argv[0], "name"))
 		return 1;
 
-	NLA_PUT_U32(msg, NL80211_ATTR_PID,
-		    strtoul(argv[0], &end, 10));
+	if ((fd = netns_get_fd(argv[1])) >= 0) {
+		NLA_PUT_U32(msg, NL80211_ATTR_NETNS_FD, fd);
+		return 0;
+	} else {
+		printf("Invalid parameter: nsname(%s)\n", argv[0]);
+	}
 
-	if (*end != '\0')
-		return 1;
+	return 1;
 
-	return 0;
  nla_put_failure:
 	return -ENOBUFS;
 }
-COMMAND(set, netns, "<pid>",
+COMMAND(set, netns, "{ <pid> | name <nsname> }",
 	NL80211_CMD_SET_WIPHY_NETNS, 0, CIB_PHY, handle_netns,
-	"Put this wireless device into a different network namespace");
+	"Put this wireless device into a different network namespace:\n"
+	"    <pid>    - change network namespace by process id\n"
+	"    <nsname> - change network namespace by name from "NETNS_RUN_DIR"\n"
+	"               or by absolute path (man ip-netns)\n");
 
 static int handle_coverage(struct nl80211_state *state,
 			struct nl_cb *cb,
