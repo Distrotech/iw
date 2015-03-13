@@ -193,7 +193,7 @@ static int wowlan_parse_net_detect(struct nl_msg *msg, int *argc, char ***argv)
 	int c  = *argc;
 	char *end, **v = *argv;
 	int err = 0, i = 0;
-	unsigned int freq, interval = 0;
+	unsigned int freq, interval = 0, delay = 0;
 	bool have_matchset = false, have_freqs = false;
 
 	nd = nla_nest_start(msg, NL80211_WOWLAN_TRIG_NET_DETECT);
@@ -236,6 +236,25 @@ static int wowlan_parse_net_detect(struct nl_msg *msg, int *argc, char ***argv)
 				NLA_PUT_U32(msg,
 					    NL80211_ATTR_SCHED_SCAN_INTERVAL,
 					    interval);
+			} else if (!strcmp(v[0], "delay")) {
+				c--; v++;
+				if (c == 0) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+
+				if (delay) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+				delay = strtoul(v[0], &end, 10);
+				if (*end) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+				NLA_PUT_U32(msg,
+					    NL80211_ATTR_SCHED_SCAN_DELAY,
+					    delay);
 			} else if (!strcmp(v[0], "matches")) {
 				parse_state = ND_MATCH;
 				if (have_matchset) {
@@ -454,7 +473,7 @@ static int handle_wowlan_enable(struct nl80211_state *state, struct nl_cb *cb,
 	return err;
 }
 COMMAND(wowlan, enable, "[any] [disconnect] [magic-packet] [gtk-rekey-failure] [eap-identity-request]"
-	" [4way-handshake] [rfkill-release] [net-detect interval <in_msecs> [freqs <freq>+] [matches [ssid <ssid>]+]]"
+	" [4way-handshake] [rfkill-release] [net-detect interval <in_msecs> [delay <in_secs>] [freqs <freq>+] [matches [ssid <ssid>]+]]"
 	" [tcp <config-file>] [patterns [offset1+]<pattern1> ...]",
 	NL80211_CMD_SET_WOWLAN, 0, CIB_PHY, handle_wowlan_enable,
 	"Enable WoWLAN with the given triggers.\n"
@@ -472,7 +491,7 @@ COMMAND(wowlan, enable, "[any] [disconnect] [magic-packet] [gtk-rekey-failure] [
 	"  [data.seq=len,offset[,start]]\n"
 	"  [data.tok=len,offset,<token stream>]\n\n"
 	"Net-detect configuration example:\n"
-	" iw phy0 wowlan enable net-detect interval 5000 freqs 2412 2422 matches ssid foo ssid bar");
+	" iw phy0 wowlan enable net-detect interval 5000 delay 30 freqs 2412 2422 matches ssid foo ssid bar");
 
 
 static int handle_wowlan_disable(struct nl80211_state *state, struct nl_cb *cb,
@@ -534,8 +553,12 @@ static int print_wowlan_handler(struct nl_msg *msg, void *arg)
 			  nla_len(trig[NL80211_WOWLAN_TRIG_NET_DETECT]), NULL);
 
 		if (nd[NL80211_ATTR_SCHED_SCAN_INTERVAL])
-			printf("\tscan interval: %d msecs\n",
+			printf("\tscan interval: %u msecs\n",
 			       nla_get_u32(nd[NL80211_ATTR_SCHED_SCAN_INTERVAL]));
+
+		if (nd[NL80211_ATTR_SCHED_SCAN_DELAY])
+			printf("\tintial scan delay: %u secs\n",
+			       nla_get_u32(nd[NL80211_ATTR_SCHED_SCAN_DELAY]));
 
 		if (nd[NL80211_ATTR_SCHED_SCAN_MATCH]) {
 			printf("\tmatches:\n");
