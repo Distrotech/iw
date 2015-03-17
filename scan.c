@@ -115,6 +115,7 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 	unsigned int freq, interval = 0, delay = 0;
 	bool have_matchset = false, have_freqs = false, have_ssids = false;
 	bool have_active = false, have_passive = false;
+	uint32_t flags = 0;
 
 	matchset = nlmsg_alloc();
 	if (!matchset) {
@@ -208,6 +209,14 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 				}
 
 				have_passive = true;
+			} else if (!strncmp(v[0], "randomise", 9) ||
+				   !strncmp(v[0], "randomize", 9)) {
+				flags |= NL80211_SCAN_FLAG_RANDOM_ADDR;
+				if (c > 0) {
+					err = parse_random_mac_addr(msg, v[0]);
+					if (err)
+						goto nla_put_failure;
+				}
 			} else {
 				/* this element is not for us, so
 				 * return to continue parsing.
@@ -312,6 +321,8 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 		nla_put_nested(msg, NL80211_ATTR_SCAN_FREQUENCIES, freqs);
 	if (have_matchset)
 		nla_put_nested(msg, NL80211_ATTR_SCHED_SCAN_MATCH, matchset);
+	if (flags)
+		NLA_PUT_U32(msg, NL80211_ATTR_SCAN_FLAGS, flags);
 
 nla_put_failure:
 	if (match)
