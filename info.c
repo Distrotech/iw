@@ -232,6 +232,12 @@ next:
 	if (tb_msg[NL80211_ATTR_MAX_SCAN_IE_LEN])
 		printf("\tmax scan IEs length: %d bytes\n",
 		       nla_get_u16(tb_msg[NL80211_ATTR_MAX_SCAN_IE_LEN]));
+	if (tb_msg[NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS])
+		printf("\tmax # sched scan SSIDs: %d\n",
+		       nla_get_u8(tb_msg[NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS]));
+	if (tb_msg[NL80211_ATTR_MAX_MATCH_SETS])
+		printf("\tmax # match sets: %d\n",
+		       nla_get_u8(tb_msg[NL80211_ATTR_MAX_MATCH_SETS]));
 
 	if (tb_msg[NL80211_ATTR_WIPHY_FRAG_THRESHOLD]) {
 		unsigned int frag;

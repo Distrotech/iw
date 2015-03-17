@@ -359,6 +359,15 @@ static int print_event(struct nl_msg *msg, void *arg)
 		}
 		printf("\n");
 		break;
+	case NL80211_CMD_START_SCHED_SCAN:
+		printf("scheduled scan started\n");
+		break;
+	case NL80211_CMD_SCHED_SCAN_STOPPED:
+		printf("sched scan stopped\n");
+		break;
+	case NL80211_CMD_SCHED_SCAN_RESULTS:
+		printf("got scheduled scan results\n");
+		break;
 	case NL80211_CMD_REG_CHANGE:
 		printf("regulatory domain change: ");
 

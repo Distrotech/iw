@@ -1980,3 +1980,32 @@ COMMAND(scan, trigger, "[freq <freq>*] [ies <hex as 00:11:..>] [meshid <meshid>]
 	NL80211_CMD_TRIGGER_SCAN, 0, CIB_NETDEV, handle_scan,
 	 "Trigger a scan on the given frequencies with probing for the given\n"
 	 "SSIDs (or wildcard if not given) unless passive scanning is requested.");
+
+
+static int handle_start_sched_scan(struct nl80211_state *state,
+				   struct nl_cb *cb, struct nl_msg *msg,
+				   int argc, char **argv, enum id_input id)
+{
+	return parse_sched_scan(msg, &argc, &argv);
+}
+
+static int handle_stop_sched_scan(struct nl80211_state *state, struct nl_cb *cb,
+				  struct nl_msg *msg, int argc, char **argv,
+				  enum id_input id)
+{
+	if (argc != 0)
+		return 1;
+
+	return 0;
+}
+
+COMMAND(scan, sched_start,
+	SCHED_SCAN_OPTIONS,
+	NL80211_CMD_START_SCHED_SCAN, 0, CIB_NETDEV, handle_start_sched_scan,
+	"Start a scheduled scan at the specified interval on the given frequencies\n"
+	"with probing for the given SSIDs (or wildcard if not given) unless passive\n"
+	"scanning is requested.  If matches are specified, only matching results\n"
+	"will be returned.");
+COMMAND(scan, sched_stop, "",
+	NL80211_CMD_STOP_SCHED_SCAN, 0, CIB_NETDEV, handle_stop_sched_scan,
+	"Stop an ongoing scheduled scan.");
