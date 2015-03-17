@@ -101,18 +101,20 @@ static int parse_random_mac_addr(struct nl_msg *msg, char *arg)
 
 int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 {
-	struct nl_msg *matchset = NULL, *freqs = NULL;
+	struct nl_msg *matchset = NULL, *freqs = NULL, *ssids = NULL;
 	struct nlattr *match = NULL;
 	enum {
 		ND_TOPLEVEL,
 		ND_MATCH,
 		ND_FREQS,
+		ND_ACTIVE,
 	} parse_state = ND_TOPLEVEL;
 	int c  = *argc;
 	char *end, **v = *argv;
 	int err = 0, i = 0;
 	unsigned int freq, interval = 0, delay = 0;
-	bool have_matchset = false, have_freqs = false;
+	bool have_matchset = false, have_freqs = false, have_ssids = false;
+	bool have_active = false, have_passive = false;
 
 	matchset = nlmsg_alloc();
 	if (!matchset) {
@@ -123,6 +125,12 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 	freqs = nlmsg_alloc();
 	if (!freqs) {
 		err = -ENOBUFS;
+		goto out;
+	}
+
+	ssids = nlmsg_alloc();
+	if (!ssids) {
+		err = -ENOMEM;
 		goto out;
 	}
 
@@ -184,6 +192,22 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 
 				have_freqs = true;
 				i = 0;
+			} else if (!strcmp(v[0], "active")) {
+				parse_state = ND_ACTIVE;
+				if (have_active || have_passive) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+
+				have_active = true;
+				i = 0;
+			} else if (!strcmp(v[0], "passive")) {
+				if (have_active || have_passive) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+
+				have_passive = true;
 			} else {
 				/* this element is not for us, so
 				 * return to continue parsing.
@@ -249,9 +273,41 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
 				c--; v++;
 			}
 			break;
+		case ND_ACTIVE:
+			if (!strcmp(v[0], "ssid")) {
+				c--; v++;
+				if (c == 0) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+
+				NLA_PUT(ssids,
+					NL80211_SCHED_SCAN_MATCH_ATTR_SSID,
+					strlen(v[0]), v[0]);
+
+				have_ssids = true;
+				i++;
+				c--; v++;
+			} else {
+				/* other element that cannot be part
+				 * of a match indicates the end of the
+				 * active set. */
+				/* need at least one item in the set */
+				if (i == 0) {
+					err = -EINVAL;
+					goto nla_put_failure;
+				}
+
+				parse_state = ND_TOPLEVEL;
+			}
+			break;
 		}
 	}
 
+	if (!have_ssids)
+		NLA_PUT(ssids, 1, 0, "");
+	if (!have_passive)
+		nla_put_nested(msg, NL80211_ATTR_SCAN_SSIDS, ssids);
 	if (have_freqs)
 		nla_put_nested(msg, NL80211_ATTR_SCAN_FREQUENCIES, freqs);
 	if (have_matchset)
