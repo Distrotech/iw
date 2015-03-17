@@ -647,6 +647,9 @@ static void print_cipher(const uint8_t *data)
 		case 6:
 			printf("AES-128-CMAC");
 			break;
+		case 7:
+			printf("NO-GROUP");
+			break;
 		case 8:
 			printf("GCMP");
 			break;
@@ -703,24 +706,37 @@ static void print_auth(const uint8_t *data)
 				data[0], data[1] ,data[2], data[3]);
 			break;
 		}
+	} else if (memcmp(data, wfa_oui, 3) == 0) {
+		switch (data[3]) {
+		case 1:
+			printf("OSEN");
+			break;
+		default:
+			printf("%.02x-%.02x-%.02x:%d",
+				data[0], data[1] ,data[2], data[3]);
+			break;
+		}
 	} else
 		printf("%.02x-%.02x-%.02x:%d",
 			data[0], data[1] ,data[2], data[3]);
 }
 
-static void print_rsn_ie(const char *defcipher, const char *defauth,
-			 uint8_t len, const uint8_t *data)
+static void _print_rsn_ie(const char *defcipher, const char *defauth,
+			  uint8_t len, const uint8_t *data, int is_osen)
 {
 	bool first = true;
-	__u16 version, count, capa;
+	__u16 count, capa;
 	int i;
 
-	version = data[0] + (data[1] << 8);
-	tab_on_first(&first);
-	printf("\t * Version: %d\n", version);
+	if (!is_osen) {
+		__u16 version;
+		version = data[0] + (data[1] << 8);
+		tab_on_first(&first);
+		printf("\t * Version: %d\n", version);
 
-	data += 2;
-	len -= 2;
+		data += 2;
+		len -= 2;
+	}
 
 	if (len < 4) {
 		tab_on_first(&first);
@@ -862,6 +878,19 @@ static void print_rsn_ie(const char *defcipher, const char *defauth,
 		}
 		printf("\n");
 	}
+}
+
+static void print_rsn_ie(const char *defcipher, const char *defauth,
+			 uint8_t len, const uint8_t *data)
+{
+	_print_rsn_ie(defcipher, defauth, len, data, 0);
+}
+
+static void print_osen_ie(const char *defcipher, const char *defauth,
+			  uint8_t len, const uint8_t *data)
+{
+	printf("\n\t");
+	_print_rsn_ie(defcipher, defauth, len, data, 1);
 }
 
 static void print_rsn(const uint8_t type, uint8_t len, const uint8_t *data)
@@ -1313,6 +1342,11 @@ static void print_wifi_wpa(const uint8_t type, uint8_t len, const uint8_t *data)
 	print_rsn_ie("TKIP", "IEEE 802.1X", len, data);
 }
 
+static void print_wifi_osen(const uint8_t type, uint8_t len, const uint8_t *data)
+{
+	print_osen_ie("OSEN", "OSEN", len, data);
+}
+
 static bool print_wifi_wmm_param(const uint8_t *data, uint8_t len)
 {
 	int i;
@@ -1666,6 +1700,7 @@ static inline void print_hs20_ind(const uint8_t type, uint8_t len, const uint8_t
 static const struct ie_print wfa_printers[] = {
 	[9] = { "P2P", print_p2p, 2, 255, BIT(PRINT_SCAN), },
 	[16] = { "HotSpot 2.0 Indication", print_hs20_ind, 1, 255, BIT(PRINT_SCAN), },
+	[18] = { "HotSpot 2.0 OSEN", print_wifi_osen, 1, 255, BIT(PRINT_SCAN), },
 };
 
 static void print_vendor(unsigned char len, unsigned char *data,
