@@ -63,6 +63,18 @@ static char *dfs_state_name(enum nl80211_dfs_state state)
 	}
 }
 
+static int ext_feature_isset(const unsigned char *ext_features, int ext_features_len,
+			     enum nl80211_ext_feature_index ftidx)
+{
+	unsigned char ft_byte;
+
+	if ((int) ftidx / 8 >= ext_features_len)
+		return 0;
+
+	ft_byte = ext_features[ftidx / 8];
+	return (ft_byte & BIT(ftidx % 8)) != 0;
+}
+
 static int print_phy_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
@@ -599,6 +611,14 @@ broken_combination:
 			printf("\tDevice supports configuring vdev MAC-addr on create.\n");
 		if (features & NL80211_FEATURE_TDLS_CHANNEL_SWITCH)
 			printf("\tDevice supports TDLS channel switching\n");
+	}
+
+	if (tb_msg[NL80211_ATTR_EXT_FEATURES]) {
+		struct nlattr *tb = tb_msg[NL80211_ATTR_EXT_FEATURES];
+
+		if (ext_feature_isset(nla_data(tb), nla_len(tb),
+				      NL80211_EXT_FEATURE_VHT_IBSS))
+			printf("\tDevice supports VHT-IBSS.\n");
 	}
 
 	if (tb_msg[NL80211_ATTR_TDLS_SUPPORT])
