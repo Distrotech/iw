@@ -397,7 +397,7 @@ static int print_wowlan_handler(struct nl_msg *msg, void *arg)
 			       nla_get_u32(nd[NL80211_ATTR_SCHED_SCAN_INTERVAL]));
 
 		if (nd[NL80211_ATTR_SCHED_SCAN_DELAY])
-			printf("\tintial scan delay: %u secs\n",
+			printf("\tinitial scan delay: %u secs\n",
 			       nla_get_u32(nd[NL80211_ATTR_SCHED_SCAN_DELAY]));
 
 		if (nd[NL80211_ATTR_SCHED_SCAN_MATCH]) {
