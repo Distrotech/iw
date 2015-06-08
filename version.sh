@@ -5,7 +5,7 @@ OUT="$1"
 
 if [ -d .git ] && head=`git rev-parse --verify HEAD 2>/dev/null`; then
 	git update-index --refresh --unmerged > /dev/null
-	descr=$(git describe)
+	descr=$(git describe --match=v*)
 
 	# on git builds check that the version number above
 	# is correct...
