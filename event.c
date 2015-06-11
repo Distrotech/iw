@@ -140,16 +140,22 @@ static void parse_cqm_event(struct nlattr **attrs)
 
 		if (!found_one)
 			printf("Unknown event type: %i\n", rssi_event);
-	} else if (cqm[NL80211_ATTR_CQM_PKT_LOSS_EVENT] &&
-		   attrs[NL80211_ATTR_MAC]) {
-		uint32_t frames;
-		char buf[3*6];
+	} else if (cqm[NL80211_ATTR_CQM_PKT_LOSS_EVENT]) {
+		if (attrs[NL80211_ATTR_MAC]) {
+			uint32_t frames;
+			char buf[3*6];
 
-		frames = nla_get_u32(cqm[NL80211_ATTR_CQM_PKT_LOSS_EVENT]);
-		mac_addr_n2a(buf, nla_data(attrs[NL80211_ATTR_MAC]));
-		printf("peer %s didn't ACK %d packets\n", buf, frames);
-	} else
+			frames = nla_get_u32(cqm[NL80211_ATTR_CQM_PKT_LOSS_EVENT]);
+			mac_addr_n2a(buf, nla_data(attrs[NL80211_ATTR_MAC]));
+			printf("peer %s didn't ACK %d packets\n", buf, frames);
+		} else {
+			printf("PKT-LOSS-EVENT did not have MAC attribute!\n");
+		}
+	} else if (cqm[NL80211_ATTR_CQM_BEACON_LOSS_EVENT]) {
+		printf("beacon loss\n");
+	} else {
 		printf("unknown event\n");
+	}
 }
 
 static const char * key_type_str(enum nl80211_key_type key_type)
@@ -598,6 +604,9 @@ static int print_event(struct nl_msg *msg, void *arg)
 			printf("(unknown)");
 		}
 		printf("\n");
+		break;
+	case NL80211_CMD_DEL_WIPHY:
+		printf("delete wiphy\n");
 		break;
 	default:
 		printf("unknown event %d (%s)\n",
